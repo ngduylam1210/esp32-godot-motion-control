@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Fantasy - Dashboard</title>
+    <style>
+        body { background: #121212; color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; }
+        .card { background: #1e1e1e; padding: 20px; margin: 20px auto; width: 90%; max-width: 500px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+        button { background: #bb86fc; color: #000; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 6px; transition: 0.3s; }
+        button:hover { background: #9b59b6; }
+        #data-display { font-size: 20px; color: #03dac6; margin-top: 15px; line-height: 1.6; }
+        .status-ok { color: #03dac6; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🎛️ Bảng Điều Khiển Tay Cầm</h1>
+    <p>Trạng thái Máy chủ: <span class="status-ok">🟢 Đang hoạt động</span></p>
+
+    <div class="card">
+        <h3>Dữ Liệu Không Gian (Real-time)</h3>
+        <div id="data-display">Đang kết nối để lấy dữ liệu...</div>
+    </div>
+
+    <div class="card">
+        <h3>Cập Nhật OTA Từ Xa</h3>
+        <p>Gửi lệnh ép buộc ESP32 khởi động lại và tải Firmware mới từ GitHub.</p>
+        <button onclick="triggerOTA()">🚀 Phát Lệnh OTA</button>
+        <p id="ota-status" style="margin-top: 15px; color: #cf6679; font-weight: bold;"></p>
+    </div>
+
+    <script>
+        // Đã tự động điền đường link Server Render của el
+        const API_URL = "https://gamefps-server.onrender.com";
+
+        // Vòng lặp lấy dữ liệu mỗi 1 giây
+        setInterval(async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/history`);
+                const data = await res.json();
+                
+                if(data.length > 0 && data[0].data) {
+                    const latest = data[0].data;
+                    document.getElementById('data-display').innerHTML =
+                        `<strong>Góc Pitch:</strong> ${latest.pitch ? latest.pitch.toFixed(1) : 0}° <br>
+                         <strong>Góc Roll:</strong> ${latest.roll ? latest.roll.toFixed(1) : 0}° <br>
+                         <strong>Góc Yaw:</strong> ${latest.yaw ? latest.yaw.toFixed(1) : 0}° <br>
+                         <strong>Nút Bấm:</strong> ${latest.buttons || 0}`;
+                }
+            } catch (e) {
+                console.log("Lỗi tải dữ liệu", e);
+            }
+        }, 1000);
+
+        // Hàm gửi lệnh OTA
+        async function triggerOTA() {
+            const statusText = document.getElementById('ota-status');
+            statusText.innerText = "⏳ Đang phát sóng lệnh OTA...";
+            try {
+                const res = await fetch(`${API_URL}/api/trigger-ota`, { method: 'POST' });
+                const result = await res.json();
+                statusText.innerText = "✅ " + result.message;
+            } catch (e) {
+                statusText.innerText = "❌ Không thể kết nối tới Server!";
+            }
+        }
+    </script>
+</body>
+</html>
