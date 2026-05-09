@@ -1,15 +1,15 @@
 {
-  "name": "game-server",
+  "name": "gamefps-server",
   "version": "1.0.0",
-  "description": "Server trung chuyển cho ESP32 và Godot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.18.2",
-    "mongoose": "^8.0.0",
-    "mqtt": "^5.0.0"
+    "mongoose": "^8.4.0",
+    "mqtt": "^5.7.0"
   }
 }
