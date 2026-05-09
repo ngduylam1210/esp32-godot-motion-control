@@ -43,6 +43,32 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('[DB] MongoDB connected'))
   .catch(err => console.error('[DB] Lỗi:', err.message));
 
+// ── 1. THÊM Schema (sau SessionSchema)
+const HealthSchema = new mongoose.Schema({
+  timestamp:     { type: Date, default: Date.now },
+  uptime:        Number,   // giây
+  voltage:       Number,   // volt pin 18650
+  temperature:   Number,   // °C lõi ESP32
+  rssi:          Number,   // dBm WiFi
+  version:       String,   // firmware version
+  resetCount:    Number,
+});
+HealthSchema.index({ timestamp: -1 });
+const HealthData = mongoose.model('HealthData', HealthSchema);
+
+// ── 1. HeathSchema
+const HealthSchema = new mongoose.Schema({
+  timestamp:     { type: Date, default: Date.now },
+  uptime:        Number,   // giây
+  voltage:       Number,   // volt pin 18650
+  temperature:   Number,   // °C lõi ESP32
+  rssi:          Number,   // dBm WiFi
+  version:       String,   // firmware version
+  resetCount:    Number,
+});
+HealthSchema.index({ timestamp: -1 });
+const HealthData = mongoose.model('HealthData', HealthSchema);
+
 // ── Kết nối HiveMQ TLS
 const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
   port: MQTT_PORT,
@@ -58,6 +84,7 @@ mqttClient.on('connect', () => {
   mqttClient.subscribe('gamefps/controller', { qos: 0 });
   mqttClient.subscribe('gamefps/command',    { qos: 1 });
   mqttClient.subscribe('gamefps/session',    { qos: 0 });
+  mqttClient.subscribe('gamefps/health',     { qos: 0 });
 });
 
 mqttClient.on('error', err => console.error('[MQTT] Lỗi:', err.message));
@@ -90,6 +117,19 @@ mqttClient.on('message', async (topic, message) => {
   if (topic === 'gamefps/session') {
     try { await Session.create(data); } catch (e) { console.error('[DB]', e.message); }
   }
+
+  // Xử lý health topic
+  if (topic === 'gamefps/health') {
+    try {
+      await HealthData.create({
+        uptime:      data.uptime      || 0,
+        voltage:     data.voltage     || 0,
+        temperature: data.temperature || 0,
+        rssi:        data.rssi        || 0,
+        version:     data.version     || '',
+        resetCount:  data.resetCount  || 0,
+      });
+    } catch (e) { console.error('[DB health]', e.message); }
 });
 
 // ── API
@@ -134,3 +174,15 @@ app.post('/api/trigger-ota', (req, res) => {
 
 app.listen(process.env.PORT || 3000, () =>
   console.log(`[API] Server port ${process.env.PORT || 3000}`));
+
+// API ENDPOINT /API/HEALTH
+app.get('/api/health', async (req, res) => {
+  try {
+    const h = await HealthData.findOne().sort({ timestamp: -1 }).lean();
+    if (!h) return res.json({ mqttConnected: mqttClient.connected });
+    res.json({
+      ...h,
+      mqttConnected: mqttClient.connected
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
