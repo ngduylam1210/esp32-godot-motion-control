@@ -1,4 +1,3 @@
-require('dotenv').config();
 const mqtt     = require('mqtt');
 const express  = require('express');
 const mongoose = require('mongoose');
