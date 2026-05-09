@@ -1,73 +1,137 @@
-const express = require('express');
+require('dotenv').config();
+const mqtt     = require('mqtt');
+const express  = require('express');
 const mongoose = require('mongoose');
-const mqtt = require('mqtt');
-const cors = require('cors');
+const cors     = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- 1. KẾT NỐI MONGODB ---
-const mongoURI = process.env.MONGO_URI; 
-mongoose.connect(mongoURI)
-  .then(() => console.log('[MongoDB] Da ket noi thanh cong!'))
-  .catch(err => console.error('[MongoDB] Loi ket noi:', err));
+// ── FIX: Parse MQTT_HOST linh hoạt (Render env có thể chứa mqtts://...host...:8883)
+function parseMqttHost(raw) {
+  try {
+    const url = new URL(raw.includes('://') ? raw : 'mqtts://' + raw);
+    return { host: url.hostname, port: url.port ? parseInt(url.port) : 8883 };
+  } catch {
+    return { host: raw, port: 8883 };
+  }
+}
+const mqttEnv   = parseMqttHost(process.env.MQTT_HOST || '');
+const MQTT_HOST = mqttEnv.host;
+const MQTT_PORT = parseInt(process.env.MQTT_PORT) || mqttEnv.port || 8883;
+console.log(`[MQTT] Host: ${MQTT_HOST}  Port: ${MQTT_PORT}`);
 
-// Tạo bảng lưu lịch sử chơi game
-const sessionSchema = new mongoose.Schema({
+// ── Schema cảm biến (FIX: trước đây thiếu hoàn toàn)
+const SensorSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
-  action: String,
-  data: Object
+  pitch:   { type: Number, default: 0 },
+  roll:    { type: Number, default: 0 },
+  yaw:     { type: Number, default: 0 },
+  buttons: { type: Number, default: 0 },
+  mode:    { type: Number, default: 0 },
 });
-const GameSession = mongoose.model('GameSession', sessionSchema);
+SensorSchema.index({ timestamp: -1 });
+const SensorData = mongoose.model('SensorData', SensorSchema);
 
-// --- 2. KẾT NỐI MQTT (HIVEMQ) ---
-const mqttHost = process.env.MQTT_HOST; // Phải có dạng mqtts://...:8883
-const mqttOptions = {
+const SessionSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  score: Number, duration: Number,
+});
+const Session = mongoose.model('Session', SessionSchema);
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('[DB] MongoDB connected'))
+  .catch(err => console.error('[DB] Lỗi:', err.message));
+
+// ── Kết nối HiveMQ TLS
+const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
+  port: MQTT_PORT,
   username: process.env.MQTT_USER,
   password: process.env.MQTT_PASS,
-  protocol: 'mqtts'
-};
-
-const client = mqtt.connect(mqttHost, mqttOptions);
-
-client.on('connect', () => {
-  console.log('[MQTT] Da ket noi toi HiveMQ Cloud!');
-  client.subscribe('darkfantasy/controller', (err) => {
-    if (!err) console.log('[MQTT] Da dang ky chu de: gamefps/controller');
-  });
+  rejectUnauthorized: false,
+  reconnectPeriod: 3000,
 });
 
-client.on('message', async (topic, message) => {
-  console.log(`[MQTT] Nhan tin nhan tu ${topic}: ${message.toString()}`);
-  // Lưu vào Database tự động
-  try {
-    const payload = JSON.parse(message.toString());
-    await GameSession.create({ action: 'CONTROLLER_DATA', data: payload });
-  } catch (error) {
-    console.log('[MQTT] Tin nhan khong phai JSON hoac loi luu DB');
+mqttClient.on('connect', () => {
+  console.log('[MQTT] Kết nối HiveMQ OK!');
+  // FIX: Subscribe đúng topic firmware v2.3 publish
+  mqttClient.subscribe('gamefps/controller', { qos: 0 });
+  mqttClient.subscribe('gamefps/command',    { qos: 1 });
+  mqttClient.subscribe('gamefps/session',    { qos: 0 });
+});
+
+mqttClient.on('error', err => console.error('[MQTT] Lỗi:', err.message));
+mqttClient.on('reconnect', () => console.log('[MQTT] Đang kết nối lại...'));
+
+// Giới hạn lưu DB 2 lần/giây
+let lastSaved = 0;
+
+mqttClient.on('message', async (topic, message) => {
+  let data;
+  try { data = JSON.parse(message.toString()); }
+  catch { return; }
+
+  if (topic === 'gamefps/controller') {
+    const now = Date.now();
+    if (now - lastSaved < 500) return; // rate limit
+    lastSaved = now;
+    try {
+      await SensorData.create({
+        pitch:   parseFloat(data.pitch)   || 0,
+        roll:    parseFloat(data.roll)    || 0,
+        yaw:     parseFloat(data.yaw)     || 0,
+        buttons: parseInt(data.buttons)   || 0,
+        mode:    parseInt(data.mode)      || 0,
+      });
+      console.log(`[DB] P:${(+data.pitch).toFixed(1)} R:${(+data.roll).toFixed(1)} Y:${(+data.yaw).toFixed(1)}`);
+    } catch (e) { console.error('[DB]', e.message); }
+  }
+
+  if (topic === 'gamefps/session') {
+    try { await Session.create(data); } catch (e) { console.error('[DB]', e.message); }
   }
 });
 
-// --- 3. TẠO WEB API CHO DASHBOARD ---
-// API Lấy dữ liệu mới nhất
+// ── API
+app.get('/api/latest', async (req, res) => {
+  try {
+    const d = await SensorData.findOne().sort({ timestamp: -1 }).lean();
+    res.json(d || { pitch: 0, roll: 0, yaw: 0, buttons: 0, mode: 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/history', async (req, res) => {
   try {
-    const history = await GameSession.find().sort({ timestamp: -1 }).limit(10);
-    res.json(history);
-  } catch (error) {
-    res.status(500).json({ error: 'Loi truy xuat du lieu' });
-  }
+    const records = await SensorData.find().sort({ timestamp: -1 }).limit(50).lean();
+    res.json(records.reverse());
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// API Bắn lệnh OTA ép buộc xuống ESP32
+app.get('/api/sessions', async (req, res) => {
+  try { res.json(await Session.find().sort({ timestamp: -1 }).limit(50)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/stats', async (req, res) => {
+  try {
+    const total = await Session.countDocuments();
+    const top   = await Session.findOne().sort({ score: -1 }).lean();
+    res.json({ total, topScore: top?.score || 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// FIX: OTA command dùng đúng topic gamefps/command + payload START_OTA
 app.post('/api/trigger-ota', (req, res) => {
-  client.publish('darkfantasy/command', JSON.stringify({ command: 'START_OTA' }));
-  res.json({ message: 'Da gui lenh OTA toi ESP32!' });
+  mqttClient.publish('gamefps/command',
+    JSON.stringify({ command: 'START_OTA', ts: Date.now() }),
+    { qos: 1 },
+    (err) => {
+      if (err) return res.status(500).json({ message: 'Lỗi: ' + err.message });
+      res.json({ message: 'Lệnh OTA đã gửi! ESP32 sẽ tự cập nhật.' });
+    }
+  );
 });
 
-// --- Khởi động Server ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`[Server] Dang chay tai port ${PORT}`);
-});
+app.listen(process.env.PORT || 3000, () =>
+  console.log(`[API] Server port ${process.env.PORT || 3000}`));
