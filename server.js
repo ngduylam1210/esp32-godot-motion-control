@@ -21,7 +21,7 @@ const MQTT_HOST = mqttEnv.host;
 const MQTT_PORT = parseInt(process.env.MQTT_PORT) || mqttEnv.port || 8883;
 console.log(`[MQTT] Host: ${MQTT_HOST}  Port: ${MQTT_PORT}`);
 
-// ── Schema cảm biến (FIX: trước đây thiếu hoàn toàn)
+// ── 1. Schema Cảm biến
 const SensorSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   pitch:   { type: Number, default: 0 },
@@ -33,41 +33,30 @@ const SensorSchema = new mongoose.Schema({
 SensorSchema.index({ timestamp: -1 });
 const SensorData = mongoose.model('SensorData', SensorSchema);
 
+// ── 2. Schema Session (Phiên chơi game)
 const SessionSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   score: Number, duration: Number,
 });
 const Session = mongoose.model('Session', SessionSchema);
 
+// ── 3. Schema Sức khỏe Phần cứng (Health) - ĐÃ XÓA PHẦN BỊ TRÙNG LẶP
+const HealthSchema = new mongoose.Schema({
+  timestamp:     { type: Date, default: Date.now },
+  uptime:        Number,   // giây
+  voltage:       Number,   // volt pin 18650
+  temperature:   Number,   // °C lõi ESP32
+  rssi:          Number,   // dBm WiFi
+  version:       String,   // firmware version
+  resetCount:    Number,
+});
+HealthSchema.index({ timestamp: -1 });
+const HealthData = mongoose.model('HealthData', HealthSchema);
+
+// ── Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('[DB] MongoDB connected'))
   .catch(err => console.error('[DB] Lỗi:', err.message));
-
-// ── 1. THÊM Schema (sau SessionSchema)
-const HealthSchema = new mongoose.Schema({
-  timestamp:     { type: Date, default: Date.now },
-  uptime:        Number,   // giây
-  voltage:       Number,   // volt pin 18650
-  temperature:   Number,   // °C lõi ESP32
-  rssi:          Number,   // dBm WiFi
-  version:       String,   // firmware version
-  resetCount:    Number,
-});
-HealthSchema.index({ timestamp: -1 });
-const HealthData = mongoose.model('HealthData', HealthSchema);
-
-// ── 1. HeathSchema
-const HealthSchema = new mongoose.Schema({
-  timestamp:     { type: Date, default: Date.now },
-  uptime:        Number,   // giây
-  voltage:       Number,   // volt pin 18650
-  temperature:   Number,   // °C lõi ESP32
-  rssi:          Number,   // dBm WiFi
-  version:       String,   // firmware version
-  resetCount:    Number,
-});
-HealthSchema.index({ timestamp: -1 });
-const HealthData = mongoose.model('HealthData', HealthSchema);
 
 // ── Kết nối HiveMQ TLS
 const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
@@ -80,7 +69,6 @@ const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
 
 mqttClient.on('connect', () => {
   console.log('[MQTT] Kết nối HiveMQ OK!');
-  // FIX: Subscribe đúng topic firmware v2.3 publish
   mqttClient.subscribe('gamefps/controller', { qos: 0 });
   mqttClient.subscribe('gamefps/command',    { qos: 1 });
   mqttClient.subscribe('gamefps/session',    { qos: 0 });
@@ -98,6 +86,7 @@ mqttClient.on('message', async (topic, message) => {
   try { data = JSON.parse(message.toString()); }
   catch { return; }
 
+  // Xử lý Controller topic
   if (topic === 'gamefps/controller') {
     const now = Date.now();
     if (now - lastSaved < 500) return; // rate limit
@@ -111,14 +100,17 @@ mqttClient.on('message', async (topic, message) => {
         mode:    parseInt(data.mode)      || 0,
       });
       console.log(`[DB] P:${(+data.pitch).toFixed(1)} R:${(+data.roll).toFixed(1)} Y:${(+data.yaw).toFixed(1)}`);
-    } catch (e) { console.error('[DB]', e.message); }
+    } catch (e) { console.error('[DB Controller]', e.message); }
   }
 
+  // Xử lý Session topic
   if (topic === 'gamefps/session') {
-    try { await Session.create(data); } catch (e) { console.error('[DB]', e.message); }
+    try { 
+      await Session.create(data); 
+    } catch (e) { console.error('[DB Session]', e.message); }
   }
 
-  // Xử lý health topic
+  // Xử lý Health topic - ĐÃ THÊM DẤU ĐÓNG NGOẶC }
   if (topic === 'gamefps/health') {
     try {
       await HealthData.create({
@@ -129,10 +121,11 @@ mqttClient.on('message', async (topic, message) => {
         version:     data.version     || '',
         resetCount:  data.resetCount  || 0,
       });
-    } catch (e) { console.error('[DB health]', e.message); }
+    } catch (e) { console.error('[DB Health]', e.message); }
+  }
 });
 
-// ── API
+// ── API ENDPOINTS ──
 app.get('/api/latest', async (req, res) => {
   try {
     const d = await SensorData.findOne().sort({ timestamp: -1 }).lean();
@@ -160,7 +153,18 @@ app.get('/api/stats', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// FIX: OTA command dùng đúng topic gamefps/command + payload START_OTA
+app.get('/api/health', async (req, res) => {
+  try {
+    const h = await HealthData.findOne().sort({ timestamp: -1 }).lean();
+    if (!h) return res.json({ mqttConnected: mqttClient.connected });
+    res.json({
+      ...h,
+      mqttConnected: mqttClient.connected
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lệnh OTA
 app.post('/api/trigger-ota', (req, res) => {
   mqttClient.publish('gamefps/command',
     JSON.stringify({ command: 'START_OTA', ts: Date.now() }),
@@ -172,17 +176,6 @@ app.post('/api/trigger-ota', (req, res) => {
   );
 });
 
+// Khởi chạy Server
 app.listen(process.env.PORT || 3000, () =>
   console.log(`[API] Server port ${process.env.PORT || 3000}`));
-
-// API ENDPOINT /API/HEALTH
-app.get('/api/health', async (req, res) => {
-  try {
-    const h = await HealthData.findOne().sort({ timestamp: -1 }).lean();
-    if (!h) return res.json({ mqttConnected: mqttClient.connected });
-    res.json({
-      ...h,
-      mqttConnected: mqttClient.connected
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
