@@ -358,7 +358,7 @@ async function fetchHealth() {
     if (!h) return;
 
     // THỜI GIAN SỬ DỤNG: Xử lý Reset mượt mà trên Web
-    if (h.uptime !== undefined && Date.now() - lastDataTime <= 3000) {
+    if (h.uptime !== undefined && Date.now() - lastDataTime <= 5000) {
       if (needUptimeReset) {
         baseUptime = h.uptime; // Lấy điểm neo mới
         needUptimeReset = false;
