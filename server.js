@@ -2,6 +2,40 @@ const mqtt     = require('mqtt');
 const express  = require('express');
 const mongoose = require('mongoose');
 const cors     = require('cors');
+const { google } = require('googleapis');
+
+//=======================================================================
+// ── Google Sheets setup
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    private_key:  process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+async function appendToSheet(tabName, values) {
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range:         `${tabName}!A:Z`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [values] },
+    });
+  } catch (e) {
+    console.error(`[Sheets] Lỗi ghi tab ${tabName}:`, e.message);
+  }
+}
+
+// ── Bộ đệm chống ghi quá nhiều
+let lastSensorLog = 0;   // ghi mỗi 10 giây
+let lastHealthLog = 0;   // ghi mỗi 30 giây
+const SENSOR_INTERVAL = 10 * 1000;
+const HEALTH_INTERVAL = 30 * 1000;
+//==================================================================
 
 const app = express();
 app.use(cors());
@@ -40,7 +74,7 @@ const SessionSchema = new mongoose.Schema({
 });
 const Session = mongoose.model('Session', SessionSchema);
 
-// ── 3. Schema Sức khỏe Phần cứng (Health) - ĐÃ XÓA PHẦN BỊ TRÙNG LẶP
+// ── 3. Schema Sức khỏe Phần cứng (Health)
 const HealthSchema = new mongoose.Schema({
   timestamp:     { type: Date, default: Date.now },
   uptime:        Number,   // giây
@@ -86,11 +120,13 @@ mqttClient.on('message', async (topic, message) => {
   try { data = JSON.parse(message.toString()); }
   catch { return; }
 
+  const currentTime = Date.now(); // Sử dụng chung 1 biến thời gian cho toàn bộ sự kiện
+
   // Xử lý Controller topic
   if (topic === 'gamefps/controller') {
-    const now = Date.now();
-    if (now - lastSaved < 500) return; // rate limit
-    lastSaved = now;
+    if (currentTime - lastSaved < 500) return; // rate limit: 2Hz
+    lastSaved = currentTime;
+    
     try {
       await SensorData.create({
         pitch:   parseFloat(data.pitch)   || 0,
@@ -101,6 +137,19 @@ mqttClient.on('message', async (topic, message) => {
       });
       console.log(`[DB] P:${(+data.pitch).toFixed(1)} R:${(+data.roll).toFixed(1)} Y:${(+data.yaw).toFixed(1)}`);
     } catch (e) { console.error('[DB Controller]', e.message); }
+
+    // Ghi vào Google Sheets mỗi SENSOR_INTERVAL
+    if (currentTime - lastSensorLog >= SENSOR_INTERVAL) {
+      lastSensorLog = currentTime;
+      const ts = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      appendToSheet('SensorLog', [
+        ts,
+        parseFloat(data.pitch).toFixed(2),
+        parseFloat(data.roll).toFixed(2),
+        parseFloat(data.yaw).toFixed(2),
+        '', '', ''   // GyroXYZ 
+      ]);
+    }
   }
 
   // Xử lý Session topic
@@ -110,7 +159,7 @@ mqttClient.on('message', async (topic, message) => {
     } catch (e) { console.error('[DB Session]', e.message); }
   }
 
-  // Xử lý Health topic - ĐÃ THÊM DẤU ĐÓNG NGOẶC }
+  // Xử lý Health topic
   if (topic === 'gamefps/health') {
     try {
       await HealthData.create({
@@ -122,6 +171,20 @@ mqttClient.on('message', async (topic, message) => {
         resetCount:  data.resetCount  || 0,
       });
     } catch (e) { console.error('[DB Health]', e.message); }
+      
+    // Ghi vào Google Sheets mỗi HEALTH_INTERVAL
+    if (currentTime - lastHealthLog >= HEALTH_INTERVAL) {
+      lastHealthLog = currentTime;
+      const ts = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      appendToSheet('HealthLog', [
+        ts,
+        data.voltage,
+        data.temperature,
+        data.rssi,
+        data.uptime,
+        data.version || '2.4'
+      ]);
+    }
   }
 });
 
@@ -176,6 +239,28 @@ app.post('/api/trigger-ota', (req, res) => {
   );
 });
 
+// ── API ghi phiên chơi (gọi từ Godot hoặc tay)
+app.post('/api/log-session', async (req, res) => {
+  try {
+    const { mode, shootCount, spellCount, duration } = req.body;
+    const ts = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const sessionId = Date.now().toString(36).toUpperCase();
+
+    await appendToSheet('SessionLog', [
+      ts, sessionId,
+      mode        || 1,
+      shootCount  || 0,
+      spellCount  || 0,
+      duration    || 0
+    ]);
+
+    res.json({ ok: true, sessionId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Khởi chạy Server
 app.listen(process.env.PORT || 3000, () =>
-  console.log(`[API] Server port ${process.env.PORT || 3000}`));
+  console.log(`[API] Server port ${process.env.PORT || 3000}`)
+);
