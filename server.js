@@ -21,7 +21,7 @@ async function appendToSheet(tabName, values) {
     const sheets = google.sheets({ version: 'v4', auth });
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range:         `${tabName}!A:Z`,
+      range:         `${tabName}!A1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [values] },
     });
@@ -81,7 +81,6 @@ const HealthSchema = new mongoose.Schema({
   voltage:       Number,   // volt pin 18650
   temperature:   Number,   // °C lõi ESP32
   rssi:          Number,   // dBm WiFi
-  version:       String,   // firmware version
   resetCount:    Number,
 });
 HealthSchema.index({ timestamp: -1 });
