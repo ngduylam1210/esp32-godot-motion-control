@@ -1,8 +1,18 @@
-const mqtt     = require('mqtt');
-const express  = require('express');
-const mongoose = require('mongoose');
+//==============================================================
+// DEBUG
+// 1. Mất khối 3D, Không hiện Khối
+// - Cổng giao tiếp API - Kết nối với Web - app.get('/api/latest')
+// 2. Web vẫn hiển thị dữ liệu số - GG sheet không nhận
+// - appendToSheet
+// 3. ESP32 không nhận OTA
+// - mqttClient.publish('gamefps/command'...) - kiểm tra URL firmware
+//==============================================================
+
+const mqtt     = require('mqtt'); // server kết nối với HiveMQ để lắng nghe ESP32
+const express  = require('express'); // tạo máy chủ web nhỏ để giao tiếp với trang dashboard
+const mongoose = require('mongoose'); // thao tác với CSDL MongoDB
 const cors     = require('cors');
-const { google } = require('googleapis');
+const { google } = require('googleapis'); // Server tự động viết vào GGS
 
 // ============================================================
 //  GOOGLE SHEETS SETUP
@@ -19,7 +29,7 @@ const auth = new google.auth.GoogleAuth({
 
 async function appendToSheet(tabName, values) {
   try {
-    const sheets = google.sheets({ version: 'v4', auth });
+    const sheets = google.sheets({ version: '', auth });
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range:         `${tabName}!A1`, // Ép ghi bắt đầu từ cột A
@@ -36,7 +46,7 @@ async function appendToSheet(tabName, values) {
 let lastSensorLog = 0;
 let lastHealthLog = 0;
 const SENSOR_INTERVAL = 10 * 1000;  // 10 giây
-const HEALTH_INTERVAL = 600 * 1000;  // 10 phút
+const HEALTH_INTERVAL = 300 * 1000;  // 10 phút
 
 // ============================================================
 //  EXPRESS
@@ -47,6 +57,7 @@ app.use(express.json());
 
 // ============================================================
 //  PARSE MQTT HOST
+// - Bóc tách chuỗi mqtts:// của biến môi trường trên Render chỉ lấy đúng IP/Domain và Port của HiveMQ
 // ============================================================
 function parseMqttHost(raw) {
   try {
@@ -63,15 +74,16 @@ console.log(`[MQTT] Host: ${MQTT_HOST}  Port: ${MQTT_PORT}`);
 
 // ============================================================
 //  MONGODB SCHEMAS
+// - Quy định dữ liệu nào được phép lưu - bỏ những dữ liệu lạ
 // ============================================================
 const SensorSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   pitch:     { type: Number, default: 0 },
   roll:      { type: Number, default: 0 },
   yaw:       { type: Number, default: 0 },
-  gx:        { type: Number, default: 0 }, // Đã thêm
-  gy:        { type: Number, default: 0 }, // Đã thêm
-  gz:        { type: Number, default: 0 }, // Đã thêm
+  gx:        { type: Number, default: 0 }, 
+  gy:        { type: Number, default: 0 }, 
+  gz:        { type: Number, default: 0 }, 
   buttons:   { type: Number, default: 0 },
   mode:      { type: Number, default: 0 },
 });
@@ -107,6 +119,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ============================================================
 //  MQTT
+// - Khi vừa kết nối với HiveMQ - nó sẽ đăng ký (subscribe) lắng nghe 4 kênh topic của dự án
 // ============================================================
 const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
   port:               MQTT_PORT,
@@ -138,7 +151,10 @@ mqttClient.on('message', async (topic, message) => {
   try { data = JSON.parse(message.toString()); }
   catch { return; }
 
+  //-----------------
   // ── CONTROLLER
+  // - Chỉ lưu vào MongoDB tối đa 2 lần/s
+  //-----------------
   if (topic === 'gamefps/controller') {
     const now = Date.now();
 
