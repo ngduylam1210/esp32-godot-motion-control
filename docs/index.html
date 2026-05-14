@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GameFPS — Controller Monitor</title>
+<title>GameFPS — Controller Monitor v2.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -13,22 +13,23 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #050508;
-  --surface:   #0b0b10;
-  --panel:     #0f0f16;
-  --border:    #1c1c28;
-  --border-hi: #2a2a40;
-  --text:      #c8cad4;
-  --dim:       #4a4a60;
-  --accent:    #00e5ff;
-  --accent2:   #7c4dff;
-  --warn:      #ff6d00;
-  --danger:    #ff1744;
-  --ok:        #00e676;
-  --pitch:     #00bcd4;
-  --roll:      #00e5ff;
-  --yaw:       #ff9100;
-  --scan:      rgba(0,229,255,.03);
+  /* TÔNG NỀN MỚI: Sáng hơn, dễ nhìn hơn */
+  --bg:         #f0f2f5; 
+  --surface:    #ffffff;
+  --panel:      #ffffff;
+  --border:     #d1d9e6;
+  --border-hi:  #aab2bd;
+  --text:       #2d3436;
+  --dim:        #636e72;
+  --accent:     #0984e3; /* Blue */
+  --accent2:    #6c5ce7; /* Purple */
+  --warn:       #e17055; /* Orange */
+  --danger:     #d63031; /* Red */
+  --ok:         #00b894; /* Green */
+  --pitch:      #0984e3;
+  --roll:       #00cec9;
+  --yaw:        #fdcb6e;
+  --scan:       rgba(9, 132, 227, 0.05);
   --font-mono: 'JetBrains Mono', monospace;
   --font-hud:  'Orbitron', sans-serif;
 }
@@ -44,84 +45,79 @@ body {
   flex-direction: column;
 }
 
-/* ── Scan-line overlay ──────────────────────────────────── */
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background: repeating-linear-gradient(
-    0deg, transparent, transparent 2px, var(--scan) 2px, var(--scan) 4px
-  );
-  pointer-events: none;
-  z-index: 999;
-}
-
 /* ── Header ─────────────────────────────────────────────── */
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  border-bottom: 2px solid var(--border);
   background: var(--surface);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   flex-shrink: 0;
+  z-index: 10;
 }
 
 .hud-title {
   font-family: var(--font-hud);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 3px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 2px;
   color: var(--accent);
-  text-shadow: 0 0 20px rgba(0,229,255,.4);
 }
 
 .status-row {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: center;
 }
 
 .pill {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 10px;
-  letter-spacing: .5px;
+  font-weight: 600;
   color: var(--dim);
+  background: #f8f9fa;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
 }
 
 .dot {
-  width: 6px; height: 6px;
+  width: 8px; height: 8px;
   border-radius: 50%;
-  background: var(--danger);
-  transition: background .3s, box-shadow .3s;
+  background: #b2bec3;
 }
-.dot.ok  { background: var(--ok);     box-shadow: 0 0 8px var(--ok); }
-.dot.warn{ background: var(--warn);   box-shadow: 0 0 8px var(--warn); }
-@keyframes throb { 0%,100%{opacity:1} 50%{opacity:.3} }
-.dot.ok { animation: throb 2s ease-in-out infinite; }
+.dot.ok  { background: var(--ok);   box-shadow: 0 0 8px rgba(0, 184, 148, 0.4); }
+.dot.warn{ background: var(--warn); box-shadow: 0 0 8px rgba(225, 112, 85, 0.4); }
 
 .clock {
   font-family: var(--font-hud);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--dim);
-  letter-spacing: 2px;
+  font-weight: 600;
 }
 
 /* ── Main grid ───────────────────────────────────────────── */
 main {
   flex: 1;
   display: grid;
-  grid-template-columns: 280px 1fr 280px;
-  grid-template-rows: 1fr 130px;
-  gap: 1px;
-  background: var(--border);
+  grid-template-columns: 300px 1fr 300px;
+  grid-template-rows: 1fr 140px;
+  gap: 15px;
+  padding: 15px;
+  background: var(--bg);
   overflow: hidden;
 }
 
 /* ── Panel base ─────────────────────────────────────────── */
 .panel {
   background: var(--panel);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
   overflow: hidden;
   position: relative;
   display: flex;
@@ -131,496 +127,152 @@ main {
 .panel-label {
   font-family: var(--font-hud);
   font-size: 9px;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   color: var(--dim);
-  padding: 8px 12px 4px;
+  padding: 10px 15px;
+  background: #fcfcfd;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .panel-label span {
   color: var(--accent);
-  margin-right: 6px;
+  margin-right: 8px;
 }
 
-/* ── LEFT: Pitch/Roll/Yaw charts ────────────────────────── */
-.panel-left {
-  grid-column: 1;
-  grid-row: 1;
-}
-
+/* ── Orientation & Charts ──────────────────────────────── */
 .angle-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  flex: 1;
-  padding: 8px 10px;
-  overflow: hidden;
-}
-
-.angle-block {
+  padding: 15px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  gap: 15px;
 }
 
-.angle-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 2px;
-}
+.angle-block { flex: 1; display: flex; flex-direction: column; }
+.angle-header { display: flex; justify-content: space-between; align-items: baseline; }
+.angle-name { font-family: var(--font-hud); font-size: 10px; color: var(--dim); }
+.angle-val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.angle-chart-wrap { flex: 1; margin-top: 5px; }
 
-.angle-name {
-  font-family: var(--font-hud);
-  font-size: 9px;
-  letter-spacing: 2px;
-}
+.n-pitch .angle-val { color: var(--pitch); }
+.n-roll  .angle-val { color: var(--roll); }
+.n-yaw   .angle-val { color: var(--yaw); }
 
-.angle-val {
-  font-size: 18px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  transition: color .2s;
-}
-
-.angle-unit { font-size: 9px; color: var(--dim); margin-left: 2px; }
-.angle-chart-wrap { flex: 1; min-height: 0; position: relative; }
-
-.n-pitch .angle-name, .n-pitch .angle-val { color: var(--pitch); }
-.n-roll  .angle-name, .n-roll  .angle-val { color: var(--roll); }
-.n-yaw   .angle-name, .n-yaw   .angle-val { color: var(--yaw); }
-
-.sep { height: 1px; background: var(--border); margin: 6px 0; flex-shrink: 0; }
-
-/* ── CENTER: 3D Model ───────────────────────────────────── */
-.panel-center {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-#canvas3d {
-  flex: 1;
-  width: 100%;
-  display: block;
-  background: transparent;
-}
+/* ── 3D Model Center ───────────────────────────────────── */
+#canvas3d { flex: 1; background: #fdfdfd; cursor: grab; }
 
 .angle-readout {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  padding: 8px;
+  gap: 40px;
+  padding: 15px;
+  background: #fcfcfd;
   border-top: 1px solid var(--border);
-  flex-shrink: 0;
 }
 
-.readout-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.readout-label {
-  font-family: var(--font-hud);
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: var(--dim);
-}
-
-.readout-val {
-  font-size: 16px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── RIGHT: Gyro & Latency ──────────────────────────────── */
-.panel-right {
-  grid-column: 3;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.perf-strip {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 8px 10px;
-  gap: 0;
-  overflow: hidden;
-}
-
-.perf-block {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.perf-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 2px;
-}
-
-.perf-name {
-  font-family: var(--font-hud);
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  color: var(--dim);
-}
-
-.perf-val {
-  font-size: 16px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent2);
-}
-
-.perf-chart-wrap { flex: 1; min-height: 0; position: relative; }
-
-/* Latency color */
-.lat-ok   { color: var(--ok); }
-.lat-warn { color: var(--warn); }
-.lat-bad  { color: var(--danger); }
-
-/* PPS meter */
-.pps-bar-wrap {
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin-top: 4px;
-  overflow: hidden;
-}
-
-.pps-bar {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent2);
-  transition: width .5s, background .3s;
-}
-
-/* ── BOTTOM: Health ─────────────────────────────────────── */
-.panel-bottom {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  display: flex;
-  flex-direction: row;
-}
-
+/* ── Health & Bottom ────────────────────────────────────── */
 .health-grid {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  padding: 8px 12px;
-  gap: 0 12px;
+  padding: 15px 20px;
+  gap: 20px;
   align-items: center;
 }
 
-.health-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.h-val { font-size: 22px; color: #2d3436; }
+.bat-track { background: #dfe6e9; height: 6px; }
+.pps-bar-wrap { background: #dfe6e9; height: 6px; }
 
-.h-label {
-  font-family: var(--font-hud);
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: var(--dim);
-  text-transform: uppercase;
-}
-
-.h-val {
-  font-size: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  line-height: 1;
-}
-
-.h-unit {
-  font-size: 9px;
-  color: var(--dim);
-}
-
-/* Battery bar */
-.bat-track {
-  height: 5px;
-  background: var(--border);
-  border-radius: 3px;
-  margin-top: 4px;
-  overflow: hidden;
-}
-
-.bat-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width .6s, background .3s;
-}
-
-/* RSSI signal bars */
-.rssi-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-  margin-top: 4px;
-}
-
-.rssi-bar {
-  width: 5px;
-  border-radius: 1px;
-  background: var(--border);
-  transition: background .3s;
-}
-
-/* Uptime glow */
-#v-uptime { color: var(--accent); text-shadow: 0 0 12px rgba(0,229,255,.3); }
-
-/* MQTT badge */
-.mqtt-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  border: 1px solid var(--border-hi);
-  font-size: 9px;
-  letter-spacing: 1px;
-  font-family: var(--font-hud);
-  margin-top: 6px;
-  width: fit-content;
-}
-
-.mqtt-badge.ok   { border-color: var(--ok);   color: var(--ok); }
-.mqtt-badge.fail { border-color: var(--danger);color: var(--danger); }
-
-/* OTA section in bottom-right */
-.ota-zone {
-  width: 200px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-}
-
+/* ── Buttons ────────────────────────────────────────────── */
 .ota-btn {
-  width: 100%;
-  padding: 8px;
-  background: transparent;
-  border: 1px solid var(--accent2);
-  color: var(--accent2);
-  font-family: var(--font-hud);
-  font-size: 10px;
-  letter-spacing: 2px;
-  cursor: pointer;
-  border-radius: 2px;
-  transition: background .2s, box-shadow .2s;
+  background: var(--accent2);
+  color: white;
+  border: none;
+  font-weight: 700;
+  padding: 10px;
+  transition: transform 0.1s;
 }
+.ota-btn:hover { background: #5f27cd; transform: translateY(-1px); }
 
-.ota-btn:hover:not(:disabled) {
-  background: rgba(124,77,255,.15);
-  box-shadow: 0 0 12px rgba(124,77,255,.3);
-}
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 10px; }
 
-.ota-btn:disabled { opacity: .4; cursor: not-allowed; }
-#ota-msg { font-size: 9px; text-align: center; color: var(--dim); min-height: 12px; }
-
-/* ── Corner decoration ──────────────────────────────────── */
-.corner {
-  position: absolute;
-  width: 10px; height: 10px;
-  border-color: var(--accent2);
-  border-style: solid;
-  opacity: .5;
-}
-.corner.tl { top: 4px; left: 4px;  border-width: 1px 0 0 1px; }
-.corner.br { bottom: 4px; right: 4px; border-width: 0 1px 1px 0; }
 </style>
 </head>
 <body>
 
-<!-- ── HEADER ── -->
 <header>
-  <div class="hud-title">GAMEFPS CONTROLLER MONITOR</div>
+  <div class="hud-title">LAB MONITOR: MPU6050 SENSOR</div>
   <div class="status-row">
-    <div class="pill"><div class="dot" id="d-server"></div><span id="t-server">SERVER</span></div>
-    <div class="pill"><div class="dot" id="d-mqtt"></div><span id="t-mqtt">MQTT</span></div>
-    <div class="pill"><div class="dot" id="d-esp"></div><span id="t-esp">ESP32</span></div>
+    <div class="pill"><div class="dot" id="d-server"></div><span id="t-server">API CLOUD</span></div>
+    <div class="pill"><div class="dot" id="d-mqtt"></div><span id="t-mqtt">MQTT BROKER</span></div>
+    <div class="pill"><div class="dot" id="d-esp"></div><span id="t-esp">ESP32 NODE</span></div>
   </div>
-  <div class="clock" id="clock">--:--:--</div>
+  <div class="clock" id="clock">00:00:00</div>
 </header>
 
-<!-- ── MAIN GRID ── -->
 <main>
-
-  <!-- LEFT: Pitch / Roll / Yaw Charts -->
   <div class="panel panel-left">
-    <div class="corner tl"></div>
-    <div class="panel-label"><span>◈</span>ORIENTATION TELEMETRY</div>
+    <div class="panel-label"><span>◈</span>ORIENTATION DATA</div>
     <div class="angle-strip">
-
       <div class="angle-block n-pitch">
-        <div class="angle-header">
-          <span class="angle-name">PITCH</span>
-          <div><span class="angle-val" id="v-pitch">—</span><span class="angle-unit">°</span></div>
-        </div>
+        <div class="angle-header"><span class="angle-name">PITCH (X)</span><span class="angle-val" id="v-pitch">0.0</span></div>
         <div class="angle-chart-wrap"><canvas id="c-pitch"></canvas></div>
       </div>
-
-      <div class="sep"></div>
-
       <div class="angle-block n-roll">
-        <div class="angle-header">
-          <span class="angle-name">ROLL</span>
-          <div><span class="angle-val" id="v-roll">—</span><span class="angle-unit">°</span></div>
-        </div>
+        <div class="angle-header"><span class="angle-name">ROLL (Y)</span><span class="angle-val" id="v-roll">0.0</span></div>
         <div class="angle-chart-wrap"><canvas id="c-roll"></canvas></div>
       </div>
-
-      <div class="sep"></div>
-
       <div class="angle-block n-yaw">
-        <div class="angle-header">
-          <span class="angle-name">YAW</span>
-          <div><span class="angle-val" id="v-yaw">—</span><span class="angle-unit">°</span></div>
-        </div>
+        <div class="angle-header"><span class="angle-name">YAW (Z)</span><span class="angle-val" id="v-yaw">0.0</span></div>
         <div class="angle-chart-wrap"><canvas id="c-yaw"></canvas></div>
       </div>
-
     </div>
   </div>
 
-  <!-- CENTER: 3D Model -->
   <div class="panel panel-center">
-    <div class="panel-label"><span>◈</span>3D SPATIAL MODEL — REAL-TIME SYNC</div>
+    <div class="panel-label"><span>◈</span>REAL-TIME SPATIAL RECONSTRUCTION</div>
     <canvas id="canvas3d"></canvas>
     <div class="angle-readout">
-      <div class="readout-item">
-        <span class="readout-label">PITCH</span>
-        <span class="readout-val" id="r-pitch" style="color:var(--pitch)">—.—°</span>
-      </div>
-      <div class="readout-item">
-        <span class="readout-label">ROLL</span>
-        <span class="readout-val" id="r-roll" style="color:var(--roll)">—.—°</span>
-      </div>
-      <div class="readout-item">
-        <span class="readout-label">YAW</span>
-        <span class="readout-val" id="r-yaw" style="color:var(--yaw)">—.—°</span>
-      </div>
+      <div class="readout-item"><span class="readout-val" id="r-pitch" style="color:var(--pitch)">0.0°</span></div>
+      <div class="readout-item"><span class="readout-val" id="r-roll" style="color:var(--roll)">0.0°</span></div>
+      <div class="readout-item"><span class="readout-val" id="r-yaw" style="color:var(--yaw)">0.0°</span></div>
     </div>
   </div>
 
-  <!-- RIGHT: Gyro drift + Latency + PPS -->
   <div class="panel panel-right">
-    <div class="corner br"></div>
-    <div class="panel-label"><span>◈</span>PERFORMANCE METRICS</div>
-    <div class="perf-strip">
-
+    <div class="panel-label"><span>◈</span>SYSTEM STABILITY</div>
+    <div class="angle-strip">
       <div class="perf-block">
-        <div class="perf-header">
-          <span class="perf-name">YAW DRIFT MONITOR</span>
-        </div>
-        <div class="perf-chart-wrap"><canvas id="c-drift"></canvas></div>
+        <span class="angle-name">NETWORK LATENCY (MS)</span>
+        <div class="angle-header"><span class="angle-val" id="v-lat" style="color:var(--accent2)">0</span></div>
+        <div class="angle-chart-wrap"><canvas id="c-gyro"></canvas></div>
       </div>
-
-      <div class="sep"></div>
-
-      <div class="perf-block" style="flex:0;min-height:auto;padding-bottom:6px">
-        <div class="perf-header">
-          <span class="perf-name">LATENCY</span>
-          <span class="perf-val" id="v-lat" style="font-size:20px">— ms</span>
-        </div>
-        <div class="perf-header" style="margin-top:6px">
-          <span class="perf-name">PACKET RATE</span>
-          <span class="perf-val" id="v-pps" style="font-size:20px">— p/s</span>
-        </div>
-        <div class="pps-bar-wrap"><div class="pps-bar" id="pps-bar" style="width:0%"></div></div>
-      </div>
-
-      <div class="sep"></div>
-
       <div class="perf-block">
-        <div class="perf-header">
-          <span class="perf-name">PITCH HISTORY</span>
-        </div>
-        <div class="perf-chart-wrap"><canvas id="c-gyro"></canvas></div>
+        <span class="angle-name">PACKET FLOW (PPS)</span>
+        <div class="angle-header"><span class="angle-val" id="v-pps" style="color:var(--accent)">0.0</span></div>
+        <div class="pps-bar-wrap"><div class="pps-bar" id="pps-bar" style="width:0%; height:100%; background:var(--accent)"></div></div>
       </div>
-
+      <div class="perf-block">
+        <span class="angle-name">YAW STABILITY (DRIFT)</span>
+        <div class="angle-chart-wrap"><canvas id="c-drift"></canvas></div>
+      </div>
     </div>
   </div>
 
-  <!-- BOTTOM: Health -->
   <div class="panel panel-bottom">
     <div class="health-grid">
-
-      <div class="health-item">
-        <span class="h-label">UPTIME</span>
-        <span class="h-val" id="v-uptime">--:--:--</span>
-        <span class="h-unit">HH:MM:SS</span>
-      </div>
-
-      <div class="health-item">
-        <span class="h-label">CORE TEMP</span>
-        <span class="h-val" id="v-temp">—°C</span>
-        <span class="h-unit" id="v-temp-s" style="color:var(--dim)">ESP32 Internal</span>
-      </div>
-
-      <div class="health-item">
-        <span class="h-label">BATTERY</span>
-        <span class="h-val" id="v-volt">—.— V</span>
-        <div class="bat-track"><div class="bat-fill" id="bat-f"></div></div>
-      </div>
-
-      <div class="health-item">
-        <span class="h-label">WIFI RSSI</span>
-        <span class="h-val" id="v-rssi">— dBm</span>
-        <div class="rssi-bars" id="rssi-b">
-          <div class="rssi-bar" style="height:3px"  id="rb1"></div>
-          <div class="rssi-bar" style="height:5px"  id="rb2"></div>
-          <div class="rssi-bar" style="height:8px"  id="rb3"></div>
-          <div class="rssi-bar" style="height:11px" id="rb4"></div>
-          <div class="rssi-bar" style="height:14px" id="rb5"></div>
-        </div>
-      </div>
-
-      <div class="health-item">
-        <span class="h-label">FIRMWARE</span>
-        <span class="h-val" id="v-fw" style="font-size:14px;color:var(--accent2)">v —</span>
-        <div class="mqtt-badge fail" id="mqtt-badge">
-          <div class="dot" id="d-mqtt2" style="width:5px;height:5px"></div>
-          <span id="t-mqtt2">HIVEMQ</span>
-        </div>
-      </div>
-
-      <div class="health-item">
-        <span class="h-label">ESP32 STATUS</span>
-        <span class="h-val" id="v-esp-s" style="font-size:11px;color:var(--dim);margin-top:4px">OFFLINE</span>
-        <span class="h-unit" id="v-reset">Reset count: —</span>
-      </div>
-
-    </div>
-
-    <!-- OTA -->
-    <div class="ota-zone">
-      <span style="font-family:var(--font-hud);font-size:9px;letter-spacing:2px;color:var(--dim)">REMOTE UPDATE</span>
-      <button class="ota-btn" id="ota-btn" onclick="triggerOTA()">▶ DEPLOY OTA</button>
-      <div id="ota-msg"></div>
+      <div class="health-item"><span class="h-label">UPTIME</span><span class="h-val" id="v-uptime" style="color:var(--accent)">00:00:00</span></div>
+      <div class="health-item"><span class="h-label">TEMPERATURE</span><span class="h-val" id="v-temp">0°C</span></div>
+      <div class="health-item"><span class="h-label">VOLTAGE</span><span class="h-val" id="v-volt">0.0V</span><div class="bat-track"><div class="bat-fill" id="bat-f" style="height:100%"></div></div></div>
+      <div class="health-item"><span class="h-label">SIGNAL RSSI</span><span class="h-val" id="v-rssi">0 dBm</span></div>
+      <div class="health-item"><span class="h-label">VERSION</span><span class="h-val" id="v-fw" style="font-size:14px">v2.5</span><div class="pill ok" style="margin-top:5px">ONLINE</div></div>
+      <div class="health-item"><button class="ota-btn" onclick="triggerOTA()">UPDATE FIRMWARE</button><div id="ota-msg" style="margin-top:5px"></div></div>
     </div>
   </div>
-
 </main>
 
 <script>
