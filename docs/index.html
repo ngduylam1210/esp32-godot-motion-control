@@ -135,10 +135,6 @@ body { background: var(--bg); color: var(--text-main); padding: 16px; min-height
         <div class="lbl">THỜI GIAN SỬ DỤNG</div>
       </div>
       <div class="health-item">
-        <div class="val" id="v-temp">—°C</div>
-        <div class="lbl" id="v-temp-lbl">NHIỆT ĐỘ LÕI</div>
-      </div>
-      <div class="health-item">
         <div class="val" id="v-rssi">— dBm</div>
         <div class="lbl">WI-FI</div>
       </div>
@@ -230,7 +226,7 @@ function updateCube(pitch, roll, yaw) {
 }
 
 // ─────────────────────────────────────────────────────────
-// CHARTS (ĐÃ ĐIỀU CHỈNH KHOẢNG HIỂN THỊ CHUẨN)
+// CHARTS 
 // ─────────────────────────────────────────────────────────
 Chart.defaults.color = '#64748b';
 Chart.defaults.font.family = 'monospace';
@@ -346,10 +342,7 @@ async function fetchHealth() {
         document.getElementById('v-uptime').textContent = 
           `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
       }
-      if (h.temperature !== undefined) {
-        document.getElementById('v-temp').textContent = h.temperature.toFixed(1) + '°C';
-        document.getElementById('v-temp').style.color = h.temperature < 65 ? 'var(--ok)' : 'var(--danger)';
-      }
+      // Đã xóa phần cập nhật dữ liệu Nhiệt độ lõi
       if (h.rssi !== undefined) {
         document.getElementById('v-rssi').textContent = h.rssi + ' dBm';
       }
@@ -366,7 +359,8 @@ setInterval(() => {
   if (now - lastDataTime > 3000) {
     needUptimeReset = true;
     setStatus('d-esp', false);
-    ['v-pitch','v-roll','v-yaw','v-lat','v-pps','v-uptime','v-temp','v-rssi'].forEach(id => {
+    // Đã xóa id 'v-temp' khỏi danh sách reset
+    ['v-pitch','v-roll','v-yaw','v-lat','v-pps','v-uptime','v-rssi'].forEach(id => {
       document.getElementById(id).textContent = '—';
     });
   } else {
