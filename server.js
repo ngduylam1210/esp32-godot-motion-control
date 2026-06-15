@@ -1,17 +1,18 @@
 //==============================================================
-// 1. Mất khối 3D, Không hiện Khối
+// DEBUG
+// 1. Mất khối 3D, Không hiện Khối
 // - Cổng giao tiếp API - Kết nối với Web - app.get('/api/latest')
-// 2. Web vẫn hiển thị dữ liệu số - GG sheet không nhận
+// 2. Web vẫn hiển thị dữ liệu số - GG sheet không nhận
 // - appendToSheet
-// 3. ESP32 không nhận OTA
-// - mqttClient.publish('gamefps/command'...) - kiểm tra URL firmware
+// 3. ESP32 không nhận OTA
+// - mqttClient.publish('gamefps/command'...) - kiểm tra URL firmware
 //==============================================================
 
-const mqtt     = require('mqtt'); // server kết nối với HiveMQ để lắng nghe ESP32
-const express  = require('express'); // tạo máy chủ web nhỏ để giao tiếp với trang dashboard
-const mongoose = require('mongoose'); // thao tác với CSDL MongoDB
+const mqtt     = require('mqtt'); // server kết nối với HiveMQ để lắng nghe ESP32
+const express  = require('express'); // tạo máy chủ web nhỏ để giao tiếp với trang dashboard
+const mongoose = require('mongoose'); // thao tác với CSDL MongoDB
 const cors     = require('cors');
-const { google } = require('googleapis'); // Server tự động viết vào GGS
+const { google } = require('googleapis'); // Server tự động viết vào GGS
 
 // ============================================================
 //  GOOGLE SHEETS SETUP
@@ -56,7 +57,7 @@ app.use(express.json());
 
 // ============================================================
 //  PARSE MQTT HOST
-// - Bóc tách chuỗi mqtts:// của biến môi trường trên Render chỉ lấy đúng IP/Domain và Port của HiveMQ
+// - Bóc tách chuỗi mqtts:// của biến môi trường trên Render chỉ lấy đúng IP/Domain và Port của HiveMQ
 // ============================================================
 function parseMqttHost(raw) {
   try {
@@ -73,7 +74,7 @@ console.log(`[MQTT] Host: ${MQTT_HOST}  Port: ${MQTT_PORT}`);
 
 // ============================================================
 //  MONGODB SCHEMAS
-// - Quy định dữ liệu nào được phép lưu - bỏ những dữ liệu lạ
+// - Quy định dữ liệu nào được phép lưu - bỏ những dữ liệu lạ
 // ============================================================
 const SensorSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
@@ -93,6 +94,7 @@ const SessionSchema = new mongoose.Schema({
   timestamp:   { type: Date, default: Date.now },
   sessionId:   String,
   mode:        Number,
+  // [ĐÃ XÓA] shootCount, spellCount
   duration:    Number,
   score:       Number,
 });
@@ -101,6 +103,7 @@ const Session = mongoose.model('Session', SessionSchema);
 const HealthSchema = new mongoose.Schema({
   timestamp:   { type: Date, default: Date.now },
   uptime:      Number,
+  // [ĐÃ XÓA] voltage, temperature
   rssi:        Number,
   version:     String,
   resetCount:  Number,
@@ -114,7 +117,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ============================================================
 //  MQTT
-// - Khi vừa kết nối với HiveMQ - nó sẽ đăng ký (subscribe) lắng nghe 4 kênh topic của dự án
+// - Khi vừa kết nối với HiveMQ - nó sẽ đăng ký (subscribe) lắng nghe 4 kênh topic của dự án
 // ============================================================
 const mqttClient = mqtt.connect(`mqtts://${MQTT_HOST}`, {
   port:               MQTT_PORT,
@@ -148,7 +151,7 @@ mqttClient.on('message', async (topic, message) => {
 
   //-----------------
   // ── CONTROLLER
-  // - Chỉ lưu vào MongoDB tối đa 2 lần/s
+  // - Chỉ lưu vào MongoDB tối đa 2 lần/s
   //-----------------
   if (topic === 'gamefps/controller') {
     const now = Date.now();
@@ -161,9 +164,9 @@ mqttClient.on('message', async (topic, message) => {
           pitch:   parseFloat(data.pitch)   || 0,
           roll:    parseFloat(data.roll)    || 0,
           yaw:     parseFloat(data.yaw)     || 0,
-          gx:      parseFloat(data.gx)      || 0, /
-          gy:      parseFloat(data.gy)      || 0, 
-          gz:      parseFloat(data.gz)      || 0, 
+          gx:      parseFloat(data.gx)      || 0, // Đã thêm
+          gy:      parseFloat(data.gy)      || 0, // Đã thêm
+          gz:      parseFloat(data.gz)      || 0, // Đã thêm
           buttons: parseInt(data.buttons)   || 0,
           mode:    parseInt(data.mode)      || 0,
         });
@@ -196,7 +199,7 @@ mqttClient.on('message', async (topic, message) => {
       
       // Ghi thêm vào Sheets khi nhận qua MQTT
       const ts = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-      // CHỈ GHI: TimeStamp, SessionID, Mode, ShootCount, SpellCount, Duration
+      // CHỈ GHI: TimeStamp, SessionID, Mode, Duration  [ĐÃ XÓA ShootCount, SpellCount]
       appendToSheet('SessionLog', [
         ts,
         data.sessionId  || 'N/A',
@@ -211,6 +214,7 @@ mqttClient.on('message', async (topic, message) => {
     try {
       await HealthData.create({
         uptime:      data.uptime      || 0,
+        // [ĐÃ XÓA] voltage, temperature
         rssi:        data.rssi        || 0,
         version:     data.version     || '',
         resetCount:  data.resetCount  || 0,
@@ -222,10 +226,9 @@ mqttClient.on('message', async (topic, message) => {
       lastHealthLog = nowH;
       const ts = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
       
-      // CHỈ GHI: TimeStamp, Temp, WiFi RSSI, Uptime
+      // CHỈ GHI: TimeStamp, WiFi RSSI, Uptime  [ĐÃ XÓA Temp]
       appendToSheet('HealthLog', [
         ts,
-        data.temperature || 0,
         data.rssi        || 0,
         data.uptime      || 0
       ]);
@@ -292,19 +295,17 @@ app.get('/api/health', async (req, res) => {
 // Ghi session thủ công
 app.post('/api/log-session', async (req, res) => {
   try {
-    const { mode, shootCount, spellCount, duration, score } = req.body;
+    const { mode, duration, score } = req.body; // [ĐÃ XÓA] shootCount, spellCount
     const ts        = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const sessionId = Date.now().toString(36).toUpperCase();
 
     await Session.create({ sessionId, mode, duration, score });
 
-    // CHỈ GHI: TimeStamp, SessionID, Mode, ShootCount, SpellCount, Duration
+    // CHỈ GHI: TimeStamp, SessionID, Mode, Duration
     appendToSheet('SessionLog', [
       ts, 
       sessionId,
       mode       || 1,
-      shootCount || 0,
-      spellCount || 0,
       duration   || 0
     ]);
 
@@ -348,8 +349,8 @@ app.get('/api/ota-status', (req, res) => {
   res.json(latestOtaStatus);
 });
 
-// ============
+// ============================================================
 //  KHỞI ĐỘNG
-// ============
+// ============================================================
 app.listen(process.env.PORT || 3000, () =>
   console.log(`[API] Server chay tren port ${process.env.PORT || 3000}`));
