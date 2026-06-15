@@ -1,5 +1,4 @@
 //==============================================================
-// DEBUG
 // 1. Mất khối 3D, Không hiện Khối
 // - Cổng giao tiếp API - Kết nối với Web - app.get('/api/latest')
 // 2. Web vẫn hiển thị dữ liệu số - GG sheet không nhận
@@ -94,8 +93,6 @@ const SessionSchema = new mongoose.Schema({
   timestamp:   { type: Date, default: Date.now },
   sessionId:   String,
   mode:        Number,
-  shootCount:  Number,
-  spellCount:  Number,
   duration:    Number,
   score:       Number,
 });
@@ -104,8 +101,6 @@ const Session = mongoose.model('Session', SessionSchema);
 const HealthSchema = new mongoose.Schema({
   timestamp:   { type: Date, default: Date.now },
   uptime:      Number,
-  voltage:     Number,
-  temperature: Number,
   rssi:        Number,
   version:     String,
   resetCount:  Number,
@@ -166,9 +161,9 @@ mqttClient.on('message', async (topic, message) => {
           pitch:   parseFloat(data.pitch)   || 0,
           roll:    parseFloat(data.roll)    || 0,
           yaw:     parseFloat(data.yaw)     || 0,
-          gx:      parseFloat(data.gx)      || 0, // Đã thêm
-          gy:      parseFloat(data.gy)      || 0, // Đã thêm
-          gz:      parseFloat(data.gz)      || 0, // Đã thêm
+          gx:      parseFloat(data.gx)      || 0, /
+          gy:      parseFloat(data.gy)      || 0, 
+          gz:      parseFloat(data.gz)      || 0, 
           buttons: parseInt(data.buttons)   || 0,
           mode:    parseInt(data.mode)      || 0,
         });
@@ -206,8 +201,6 @@ mqttClient.on('message', async (topic, message) => {
         ts,
         data.sessionId  || 'N/A',
         data.mode       || 1,
-        data.shootCount || 0,
-        data.spellCount || 0,
         data.duration   || 0
       ]);
     } catch (e) { console.error('[DB Session]', e.message); }
@@ -218,8 +211,6 @@ mqttClient.on('message', async (topic, message) => {
     try {
       await HealthData.create({
         uptime:      data.uptime      || 0,
-        voltage:     data.voltage     || 0,
-        temperature: data.temperature || 0,
         rssi:        data.rssi        || 0,
         version:     data.version     || '',
         resetCount:  data.resetCount  || 0,
@@ -305,7 +296,7 @@ app.post('/api/log-session', async (req, res) => {
     const ts        = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
     const sessionId = Date.now().toString(36).toUpperCase();
 
-    await Session.create({ sessionId, mode, shootCount, spellCount, duration, score });
+    await Session.create({ sessionId, mode, duration, score });
 
     // CHỈ GHI: TimeStamp, SessionID, Mode, ShootCount, SpellCount, Duration
     appendToSheet('SessionLog', [
@@ -357,8 +348,8 @@ app.get('/api/ota-status', (req, res) => {
   res.json(latestOtaStatus);
 });
 
-// ============================================================
+// ============
 //  KHỞI ĐỘNG
-// ============================================================
+// ============
 app.listen(process.env.PORT || 3000, () =>
   console.log(`[API] Server chay tren port ${process.env.PORT || 3000}`));
