@@ -379,10 +379,10 @@ async function triggerOTA() {
     const res = await fetch(`${API}/api/trigger-ota`, { method:'POST' });
     const json = await res.json();
     msg.style.color = 'var(--ok)';
-    msg.textContent = '✅ Đã gửi lệnh. ESP32 sẽ tự cập nhật.';
+    msg.textContent = 'Đã gửi lệnh. ESP32 sẽ tự cập nhật.';
   } catch(e) {
     msg.style.color = 'var(--danger)';
-    msg.textContent = '❌ Lỗi kết nối Server!';
+    msg.textContent = 'Lỗi kết nối Server!';
   }
   setTimeout(() => { btn.disabled = false; msg.textContent = 'Hệ thống sẵn sàng...'; msg.style.color='var(--text-muted)'; }, 5000);
 }
