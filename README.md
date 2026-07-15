@@ -27,10 +27,10 @@ Networking & IoT: UDP, MQTT (HiveMQ), WiFiManager.
 Software: GDScript (Godot Engine), Node.js (Web Dashboard Server).
 
 # Project Structure
-├── firmware/          # ESP32 C++ source code
-├── server/            # Node.js server & Web Dashboard
-├── game_godot/       # Godot Engine project files
-└── README.md          # Project documentation
+firmware/          # ESP32 C++ source code
+server/            # Node.js server & Web Dashboard
+game_godot/        # Godot Engine project files
+README.md          # Project documentation
 
 # Data Flow Architecture
 Sense: ESP32 retrieves raw sensor data via I2C protocol.
