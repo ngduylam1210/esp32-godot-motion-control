@@ -15,12 +15,12 @@
 // ============================================================
 // CẤU HÌNH HIVEMQ + OTA URL
 // ============================================================
-const char* mqtt_server = "4bbe6f2875794fd2b57191bdd53f7d8d.s1.eu.hivemq.cloud";
+const char* mqtt_server = "";
 const int   mqtt_port   = 8883;
-const char* mqtt_user   = "6351020029";
-const char* mqtt_pass   = "0982209812Kho@";
+const char* mqtt_user   = "";
+const char* mqtt_pass   = "";
 
-const char* OTA_BIN_URL = "https://raw.githubusercontent.com/ngduylam1210/GameFPS-Server/main/firmware.bin";
+const char* OTA_BIN_URL = "";
 
 WiFiClientSecure secureEspClient;
 PubSubClient     mqttClient(secureEspClient);
@@ -334,7 +334,7 @@ void Task_OTA(void *pvParameters) {
 // ============================================================
 void Task_UDP_Stream(void *pvParameters) {
   if (WiFi.status() == WL_CONNECTED) {
-    udp.close();  // Đảm bảo socket sạch trước khi dùng
+    udp.close();  
   }
 
   ControllerData buffer;
